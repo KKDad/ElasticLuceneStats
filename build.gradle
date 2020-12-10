@@ -1,0 +1,45 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+repositories {
+    jcenter()
+    mavenCentral()
+}
+
+ext {
+    // Organized alphabetically - Please keep it that way!
+    commonsCliVersion = '1.4'
+    junitJupiterVersion = '5.5.1'
+    log4jVersion="2.13.3"
+    log4jClassicVersion="1.2.3"
+    luceneCoreVersion = "8.5.2"
+    slf4jVersion = "1.7.30"
+}
+
+dependencies {
+    // This dependency is used by the application.
+    implementation "com.google.guava:guava:28.0-jre"
+    implementation "com.google.code.gson:gson:2.8.6"
+    implementation "org.apache.lucene:lucene-core:$luceneCoreVersion"
+
+    implementation "org.apache.logging.log4j:log4j-api:$log4jVersion"
+    implementation "org.slf4j:slf4j-api:$slf4jVersion"
+    implementation "commons-cli:commons-cli:$commonsCliVersion"
+    implementation "org.elasticsearch:elasticsearch-x-content:7.6.2"
+
+    testImplementation "org.junit.jupiter:junit-jupiter-api:$junitJupiterVersion"
+
+    testRuntimeOnly "org.apache.logging.log4j:log4j-core:$log4jVersion"
+    testRuntimeOnly "ch.qos.logback:logback-classic:$log4jClassicVersion"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junitJupiterVersion"
+}
+
+application {
+    mainClassName = 'LuceneStats.App'
+}
+
+test {
+    useJUnitPlatform()
+}

@@ -1,0 +1,15 @@
+#
+# https://help.github.com/articles/dealing-with-line-endings/
+#
+# These are explicitly windows files and should use crlf
+*.bat           text eol=crlf
+
+*       text=auto
+
+*.txt   text
+*.java  text diff=java
+*.xml   text diff=xml
+# Shell scripts require LF
+*.sh    text eol=lf
+# Batch scripts require CRLF
+*.bat   text eol=crlf

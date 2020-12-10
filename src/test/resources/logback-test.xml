@@ -1,0 +1,18 @@
+<configuration debug="false" scan="true">
+
+    <appender name="STDOUT" target="System.out" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <Pattern>%yellow(%d{ISO8601}) %highlight(%-5level) [%white(%t{5})] %green(%logger{15}): %m%n%boldRed(%ex{short})</Pattern>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>DEBUG</level>
+        </filter>
+    </appender>
+
+    <logger name="io.k8s.cassandra" level="DEBUG"/>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+    </root>
+
+</configuration>
