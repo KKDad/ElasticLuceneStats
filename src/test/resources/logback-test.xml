@@ -2,7 +2,8 @@
 
     <appender name="STDOUT" target="System.out" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <Pattern>%yellow(%d{ISO8601}) %highlight(%-5level) [%white(%t{5})] %green(%logger{15}): %m%n%boldRed(%ex{short})</Pattern>
+<!--            <Pattern>%yellow(%d{ISO8601}) %highlight(%-5level) [%white(%t{5})] %green(%logger{15}): %m%n%boldRed(%ex{short})</Pattern>-->
+            <Pattern>%yellow(%d{ISO8601}) %m%n%boldRed(%ex{short})</Pattern>
         </encoder>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>DEBUG</level>
