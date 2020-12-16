@@ -106,11 +106,14 @@ public class ElasticLuceneStats {
         String esIndexDirectory = esStateDirectory.replace("_state", "indices");
         long esIndexSize = getDirectorySize(Paths.get(esIndexDirectory));
         dm.INDEX_GROUPS.forEach((indexGroupName, indexGroup) -> {
-            // Load the Statistics for each segment
-            indexGroup.fields.forEach((key, fieldStats) -> fieldStats.calculate(indexGroup.indexGroupSize, indexGroup.indexTranslogSize));
 
             // Display Segment Details
             indexGroup.indices.forEach(i -> loadIndexStats(indexGroup, i));
+            indexGroup.calculate();
+
+            // Load the Statistics for each segment
+            indexGroup.fields.forEach((key, fieldStats) -> fieldStats.calculate(indexGroup.totalCalculatedSize));
+
             LOG.info("Index Group: {}", indexGroupName);
             LOG.info(SECTION_SEPARATOR);
             for (IndexShard index : indexGroup.indices) {
@@ -122,10 +125,10 @@ public class ElasticLuceneStats {
             LOG.info("Index Statistics: {}", indexGroupName);
             LOG.info(" - # of Documents    : {}", String.format("%,15d", indexGroup.docs));
             LOG.info(" - # of Deleted Docs : {}", String.format("%,15d", indexGroup.deletedDocs));
-            LOG.info(" - Overall Percentage: {}", String.format("%15.2f %%", ((double) indexGroup.indexGroupSize / esIndexSize)*100));
-            LOG.info(" - Lucene Index      : {}", String.format(DISK_BYTES, indexGroup.indexGroupSize));
-            LOG.info(" - Lucene TransLog   : {}", String.format(DISK_BYTES, indexGroup.indexTranslogSize));
-            LOG.info(" - Total Uncompressed: {}", String.format(DISK_BYTES, indexGroup.indexGroupSize));
+            LOG.info(" - Overall Percentage: {}", String.format("%15.2f %%", ((double) indexGroup.totalDiskSize / esIndexSize)*100));
+            LOG.info(" - Lucene Index      : {}", String.format(DISK_BYTES, indexGroup.totalDiskSize));
+            LOG.info(" - Lucene TransLog   : {}", String.format(DISK_BYTES, indexGroup.totalTransLogSize));
+            LOG.info(" - Total Uncompressed: {}", String.format(DISK_BYTES, indexGroup.totalDiskSize));
             LOG.info(SECTION_SEPARATOR);
             if (indexGroup.fields.size() == 0)
                 LOG.info("No Records");

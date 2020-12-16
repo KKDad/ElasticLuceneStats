@@ -16,7 +16,7 @@ public class StartupUtils {
         //option.setRequired(true);
         options.addOption(option);
 
-        option = new Option("d", "indexDirectory", true, "directoring containing lucene index");
+        option = new Option("d", "indexDirectory", true, "directory containing lucene index");
         option.setRequired(true);
         options.addOption(option);
 

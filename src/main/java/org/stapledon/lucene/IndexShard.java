@@ -14,10 +14,10 @@ class IndexShard {
     long numDeleted;
 
     public String getIndexDirectoryName() {
-        return String.format("%s\\%s\\0\\index", indexHome, directoryName);
+        return String.format("%s/%s/0/index", indexHome, directoryName);
     }
     public String getTransLogDirectoryName() {
-        return String.format("%s\\%s\\0\\translog", indexHome, directoryName);
+        return String.format("%s/%s/0/translog", indexHome, directoryName);
     }
 
     public IndexShard(String indexHome, String indexName, String directoryName) {
@@ -38,6 +38,6 @@ class IndexShard {
 
     @Override
     public String toString() {
-        return String.format("  %s, %,d docs, %,d deleted docs, %,d bytes, %,2.2f bytes/doc  dir: %s", indexName, numDocs, numDeleted, indexByteSize, (float)indexByteSize /numDocs, directoryName);
+        return String.format("%s; %,d docs;  %,d deleted docs;  %,d bytes;  %,2.2f bytes/doc  dir: %s", indexName, numDocs, numDeleted, indexByteSize, (float)indexByteSize /numDocs, directoryName);
     }
 }

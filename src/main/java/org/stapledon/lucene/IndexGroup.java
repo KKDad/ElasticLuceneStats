@@ -11,8 +11,9 @@ public class IndexGroup {
 
     public final Map<String, FieldStatsHolder> fields;
 
-    public long indexGroupSize = 0L;
-    public long indexTranslogSize = 0L;
+    public long totalDiskSize = 0L;
+    public long totalCalculatedSize = 0L;
+    public long totalTransLogSize = 0L;
     public long docs = 0L;
     public long deletedDocs = 0L;
 
@@ -27,9 +28,15 @@ public class IndexGroup {
         this.indices.add(index);
     }
 
+    public void calculate()
+    {
+        this.totalCalculatedSize = this.fields.values().stream().map(FieldStatsHolder::getTotal).reduce(0L, Long::sum);
+    }
+
+
     public void updateDiskUsage(long indexGroupSize, long indexTranslogSize) {
-        this.indexGroupSize +=indexGroupSize;
-        this.indexTranslogSize += indexTranslogSize;
+        this.totalDiskSize +=indexGroupSize;
+        this.totalTransLogSize += indexTranslogSize;
     }
 
     public void updateDocs(long docs, long deletedDocs) {

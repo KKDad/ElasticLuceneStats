@@ -19,7 +19,9 @@ public class FieldStatsHolder {
     long totalBlockOtherBytes;
 
     long indexTotalBytes;
-    long indexTotalTransLogBytes;
+
+    // Sum of Terms (Not unique)
+    long totalTermCount;
 
 
 
@@ -29,10 +31,9 @@ public class FieldStatsHolder {
         return storedFieldBytes + indexNumBytes + totalTermBytes + totalBlockSuffixBytes + totalUncompressedBlockSuffixBytes + totalBlockStatsBytes + totalBlockOtherBytes;
     }
 
-    public void calculate(long indexTotalBytes, long indexTotalTransLogBytes)
+    public void calculate(long indexTotalBytes)
     {
         this.indexTotalBytes = indexTotalBytes;
-        this.indexTotalTransLogBytes = indexTotalTransLogBytes;
         percentage = ((double)getTotal())  / indexTotalBytes * 100;
     }
 
@@ -48,6 +49,8 @@ public class FieldStatsHolder {
         totalUncompressedBlockSuffixBytes += stats.totalUncompressedBlockSuffixBytes;
         totalBlockStatsBytes += stats.totalBlockStatsBytes;
         totalBlockOtherBytes += stats.totalBlockOtherBytes;
+
+        totalTermCount += stats.totalTermCount;
     }
 
     public void accumulateStoredFieldBytes(Long storedFieldBytes) {
@@ -56,7 +59,19 @@ public class FieldStatsHolder {
 
     @Override
     public String toString() {
-        return String.format("%-35s (%5.2f%%), %-30s   Stored=%,d, IndexBytes=%,d, TermBytes=%,d, BlockSuffixBytes=%,d, UncompressedBlockSuffixBytes=%,d, BlockStatsBytes=%,d, BlockOtherBytes=%,d, FieldTotal=%,d",
-                name, percentage, indexOptions, storedFieldBytes, indexNumBytes, totalTermBytes, totalBlockSuffixBytes, totalUncompressedBlockSuffixBytes, totalBlockStatsBytes, totalBlockOtherBytes, getTotal());
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("%-35s (%5.2f%%), %-30s ",  name, percentage, indexOptions));
+        if (getTotal() > 0 || storedFieldBytes> 0 || indexNumBytes > 0)
+            sb.append(String.format("Field %,d bytes; Stored=%,d; IndexBytes=%,d; ", getTotal(), storedFieldBytes, indexNumBytes));
+        if (totalTermCount > 0)
+            sb.append(String.format("Terms=%d; %2.2f bytes/term", totalTermCount, (double) (totalTermBytes)/totalTermCount));
+        if (totalTermBytes > 0 || totalBlockSuffixBytes > 0 || totalUncompressedBlockSuffixBytes > 0 || totalBlockStatsBytes > 0 || totalBlockOtherBytes > 0) {
+            sb.append(
+                    String.format("; TermBytes=%,d; BlockSuffixBytes=%,d; UncompressedBlockSuffixBytes=%,d; BlockStatsBytes=%,d; BlockOtherBytes=%,d",
+                                  totalTermBytes, totalBlockSuffixBytes, totalUncompressedBlockSuffixBytes, totalBlockStatsBytes, totalBlockOtherBytes)
+            );
+        }
+
+        return sb.toString();
     }
 }
