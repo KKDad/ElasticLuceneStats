@@ -26,7 +26,7 @@ class Index {
         this.directoryName = directoryName;
 
     }
-    public void accumulateDocs(long numDocs, long numDeleted) {
+    public void updateDocs(long numDocs, long numDeleted) {
         this.numDocs += numDocs;
         this.numDeleted += numDeleted;
     }

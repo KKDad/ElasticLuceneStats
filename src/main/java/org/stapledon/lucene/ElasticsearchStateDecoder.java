@@ -58,10 +58,9 @@ public class ElasticsearchStateDecoder {
     private static final Logger LOG = LoggerFactory.getLogger(ElasticsearchStateDecoder.class);
 
     private final Map<String, String> indexMappings = new TreeMap<>();
+    public final Map<String, IndexGroup> INDEX_GROUPS = new TreeMap<>();
 
-    public final Map<String, List<Index>> INDEX_GROUPS = new TreeMap<>();
-
-    // Parse index names are in the format of <Index>_<TID>[_-]<Postfix> into logical groupings
+    // Interset index names are in the format of <Index>_<TID>[_-]<Postfix> into logical groupings
     private static final String INDEX_NAME_PATTERN = "([a-zA-Z_]+){1,3}_(\\d){1,3}[-_]?(.*)";
     private final Pattern pattern = Pattern.compile(INDEX_NAME_PATTERN);
     private final String indexHome;
@@ -71,6 +70,7 @@ public class ElasticsearchStateDecoder {
         LOG.warn("Reading {}", directory);
         this.decode(directory);
         this.generateGroupings();
+        LOG.info("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
     }
 
     private void generateGroupings() {
@@ -79,19 +79,19 @@ public class ElasticsearchStateDecoder {
             String indexNameShort = indexName;
             if (m.matches())
                 indexNameShort = m.group(1);
-            INDEX_GROUPS.putIfAbsent(indexNameShort, new ArrayList<>());
-            INDEX_GROUPS.get(indexNameShort).add(new Index(indexHome, indexName, directoryName));
+            INDEX_GROUPS.putIfAbsent(indexNameShort, new IndexGroup(indexNameShort));
+            INDEX_GROUPS.get(indexNameShort).addIndex(new Index(indexHome, indexName, directoryName));
         });
 
-        INDEX_GROUPS.forEach((key, value) -> {
+        INDEX_GROUPS.forEach((key, indexGroup) -> {
             LOG.info("Index {}", key);
-            for (Index index : value) {
+            for (Index index : indexGroup.indices) {
                 LOG.info("  -> {}", index);
             }
         });
     }
 
-    protected void decode(String directory) {
+    private void decode(String directory) {
         try {
             Directory indexDirectory = FSDirectory.open(Paths.get(directory));
             try (IndexReader indexReader = DirectoryReader.open(indexDirectory)) {

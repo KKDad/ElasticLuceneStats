@@ -13,51 +13,54 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 public class LuceneStats {
     private static final Logger LOG = LoggerFactory.getLogger(LuceneStats.class);
+    public static final String DISK_BYTES = "%,15d bytes";
 
-    public static void main(String[] args) {
+    public static void main(String[] args)
+    {
         LuceneStats ls = new LuceneStats();
         CommandLine cmd = StartupUtils.parseOptions(args);
-        ls.process(cmd.getOptionValue("indexDirectory"));
+        ls.processNode(cmd.getOptionValue("indexDirectory"));
     }
 
-    public final Map<String, StatsHolder> FIELD_STATS = new TreeMap<>();
-    private long ES_INDEX_SIZE = 0L;
-    private long INDEX_GROUP_SIZE = 0L;
-    private long INDEX_TRANSLOG_SIZE = 0L;
-    private long CALCULATED_GROUP_SIZE = 0L;
 
-
-    public void loadIndexStats(Index index) {
+    private void loadIndexStats(IndexGroup group, Index index) {
         try {
-            this.INDEX_GROUP_SIZE += getDirectorySize(Paths.get(index.getIndexDirectoryName()));
-            this.INDEX_TRANSLOG_SIZE += getDirectorySize(Paths.get(index.getTransLogDirectoryName()));
+            // Get the size of this index and add it to the Index Group
+            long indexGroupSize = getDirectorySize(Paths.get(index.getIndexDirectoryName()));
+            long indexTranslogSize = getDirectorySize(Paths.get(index.getTransLogDirectoryName()));
+            group.updateDiskUsage(indexGroupSize, indexTranslogSize);
+
             Directory indexDirectory = FSDirectory.open(Paths.get(index.getIndexDirectoryName()));
-            IndexReader indexReader = DirectoryReader.open(indexDirectory);
-            LOG.debug("Number of Docs: {}", indexReader.numDocs());
-            for (LeafReaderContext context : indexReader.leaves()) {
-                // Visit all of the documents and calculate the size of the stored fields
-                StatsStoredFieldVisitor statsStoredFieldVisitor = new StatsStoredFieldVisitor();
-                LeafReader reader = FilterLeafReader.unwrap(context.reader());
-                int i = 0;
-                while (i < reader.maxDoc()) {
-                    reader.document(i, statsStoredFieldVisitor);
-                    i++;
-                }
-                for (FieldInfo field : reader.getFieldInfos()) {
-                    FIELD_STATS.putIfAbsent(field.name, new StatsHolder(field.name));
-                    Terms terms = reader.terms(field.name);
-                    if (terms instanceof FieldReader) {
-                        Stats fieldStats = ((FieldReader) terms).getStats();
-                        FIELD_STATS.get(field.name).accumulateStats(fieldStats);
+            try (IndexReader indexReader = DirectoryReader.open(indexDirectory)) {
+                LOG.debug("Number of Docs: {}", indexReader.numDocs());
+                for (LeafReaderContext context : indexReader.leaves()) {
+                    // Visit all of the documents and calculate the size of the stored fields
+                    StatsStoredFieldVisitor statsStoredFieldVisitor = new StatsStoredFieldVisitor();
+                    LeafReader reader = FilterLeafReader.unwrap(context.reader());
+                    int i = 0;
+                    while (i < reader.maxDoc()) {
+                        reader.document(i, statsStoredFieldVisitor);
+                        i++;
                     }
-                    long docValues = statsStoredFieldVisitor.STATS.getOrDefault(field.name, 0L);
-                    FIELD_STATS.get(field.name).accumulateStoredFieldBytes(docValues);
-                    index.accumulateDocs(reader.numDocs(), reader.numDeletedDocs());
+                    // Visit all of the Fields and get the statistics for them
+                    for (FieldInfo field : reader.getFieldInfos()) {
+                        group.fields.putIfAbsent(field.name, new FieldStatsHolder(field.name, field.getIndexOptions()));
+                        Terms terms = reader.terms(field.name);
+                        if (terms instanceof FieldReader) {
+                            Stats fieldStats = ((FieldReader) terms).getStats();
+                            group.fields.get(field.name).accumulateStats(fieldStats);
+                        }
+                        long docValues = statsStoredFieldVisitor.STATS.getOrDefault(field.name, 0L);
+                        group.fields.get(field.name).accumulateStoredFieldBytes(docValues);
+                    }
+                    // Accumulate the number of docs and deleted docs for this segment
+                    index.updateDocs(reader.numDocs(), reader.numDeletedDocs());
+                    group.updateDocs(reader.numDocs(), reader.numDeletedDocs());
                 }
             }
         } catch (IOException e) {
@@ -88,82 +91,40 @@ public class LuceneStats {
     }
 
 
-    public void process(String directory) {
-        ElasticsearchStateDecoder dm = new ElasticsearchStateDecoder(directory);
-        String indexHome = directory.replace("_state", "indices");
-        ES_INDEX_SIZE = getDirectorySize(Paths.get(indexHome));
-        dm.INDEX_GROUPS.forEach((s, indices) -> {
-            for (Index indexItem : indices) {
-                loadIndexStats(indexItem);
-            }
-            LOG.info("Processing Index Group: {}", s);
-            FIELD_STATS.forEach((key, value) -> { CALCULATED_GROUP_SIZE += value.getTotal(); });
-            FIELD_STATS.forEach((key, value) -> {
-                value.calculate(CALCULATED_GROUP_SIZE, INDEX_TRANSLOG_SIZE);
-                LOG.info("  -> {}", value);
-            });
-            LOG.info("Index Group: {}, {}% of node total, Index: {} bytes, Total bytes (Uncompressed): {},", s, String.format("%2.2f", ((double)INDEX_GROUP_SIZE/ES_INDEX_SIZE)*100), String.format("%,-2d", INDEX_GROUP_SIZE), String.format("%,-2d", CALCULATED_GROUP_SIZE));
-            LOG.info("--------------------------------------------------\n\n");
+    public void processNode(String esStateDirectory) {
+        if (!esStateDirectory.toLowerCase().endsWith("_state")) {
+            LOG.error("This doesn't look like a Elasticsearch node state directory.");
+            LOG.error("Expected something like: D:\\elasticsearch\\ag16-cdf-single.ad.interset.com\\nodes\\0\\_state");
+            return;
+        }
+        ElasticsearchStateDecoder dm = new ElasticsearchStateDecoder(esStateDirectory);
+        if (dm.INDEX_GROUPS.size() == 0) {
+            LOG.error("No index groups loaded.");
+            return;
+        }
+        String esIndexDirectory = esStateDirectory.replace("_state", "indices");
+        long esIndexSize = getDirectorySize(Paths.get(esIndexDirectory));
+        dm.INDEX_GROUPS.forEach((indexGroupName, indexGroup) -> {
 
-            FIELD_STATS.clear();
-            INDEX_GROUP_SIZE = 0L;
-            INDEX_TRANSLOG_SIZE = 0L;
-            CALCULATED_GROUP_SIZE = 0L;
+            AtomicReference<Long> calculatedGroupSize = new AtomicReference<>(0L);
+            indexGroup.indices.forEach(i -> loadIndexStats(indexGroup, i));
+
+            indexGroup.fields.forEach((key, fieldStats) -> calculatedGroupSize.updateAndGet(v -> v + fieldStats.getTotal()));
+            indexGroup.fields.forEach((key, fieldStats) -> fieldStats.calculate(calculatedGroupSize.get(), indexGroup.indexTranslogSize));
+            LOG.info("Index Group: {}", indexGroupName);
+            LOG.info(" - # of Documents    : {}", String.format("%,2d", indexGroup.docs));
+            LOG.info(" - # of Deleted Docs : {}", String.format("%,2d", indexGroup.deletedDocs));
+            LOG.info(" - Overall Percentage: {}", String.format("%2.2f%%", ((double) indexGroup.indexGroupSize / esIndexSize)*100));
+            LOG.info(" - Overall Percentage: {}", String.format("%2.2f%%", ((double) indexGroup.indexGroupSize / esIndexSize)*100));
+            LOG.info(" - Lucene Index      : {}", String.format(DISK_BYTES, indexGroup.indexGroupSize));
+            LOG.info(" - Lucene TransLog   : {}", String.format(DISK_BYTES, indexGroup.indexTranslogSize));
+            LOG.info(" - Total Uncompressed: {}", String.format(DISK_BYTES, calculatedGroupSize.get()));
+            LOG.info("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+            indexGroup.fields.forEach((key, fieldStats) -> {
+                fieldStats.calculate(calculatedGroupSize.get(), indexGroup.indexTranslogSize);
+                LOG.info("  -> {}", fieldStats);
+            });
+            LOG.info("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n\n");
         });
     }
-
-    class StatsHolder {
-        String name;
-
-        // Stored Documents
-        long storedFieldBytes;
-
-        // Term Stats
-        long indexNumBytes;
-        long totalTermBytes;
-        long totalBlockSuffixBytes;
-        long totalUncompressedBlockSuffixBytes;
-        long totalBlockStatsBytes;
-        long totalBlockOtherBytes;
-
-        long indexTotalBytes;
-        long indexTotalTransLogBytes;
-
-        // Total
-        double percentage;
-        Long getTotal() {
-            return storedFieldBytes + indexNumBytes + totalTermBytes + totalBlockSuffixBytes + totalUncompressedBlockSuffixBytes + totalBlockStatsBytes + totalBlockOtherBytes;
-        }
-
-        public void calculate(long indexTotalBytes, long indexTotalTransLogBytes)
-        {
-            this.indexTotalBytes = indexTotalBytes;
-            this.indexTotalTransLogBytes = indexTotalTransLogBytes;
-            percentage = ((double)getTotal())  / indexTotalBytes * 100;
-        }
-
-        public StatsHolder(String name) {
-            this.name = name;
-        }
-
-        public void accumulateStats(Stats stats) {
-            indexNumBytes += stats.indexNumBytes;
-            totalTermBytes += stats.totalTermBytes;
-            totalBlockSuffixBytes += stats.totalBlockSuffixBytes;
-            totalUncompressedBlockSuffixBytes += stats.totalUncompressedBlockSuffixBytes;
-            totalBlockStatsBytes += stats.totalBlockStatsBytes;
-            totalBlockOtherBytes += stats.totalBlockOtherBytes;
-        }
-
-        public void accumulateStoredFieldBytes(Long storedFieldBytes) {
-            this.storedFieldBytes += storedFieldBytes;
-        }
-
-        @Override
-        public String toString() {
-            return String.format("%-35s (%2.2f%%), Stored=%,d, IndexBytes=%,d, TermBytes=%,d, BlockSuffixBytes=%,d, UncompressedBlockSuffixBytes=%,d, BlockStatsBytes=%,d, BlockOtherBytes=%,d, FieldTotal=%,d",
-                    name, percentage, storedFieldBytes, indexNumBytes, totalTermBytes, totalBlockSuffixBytes, totalUncompressedBlockSuffixBytes, totalBlockStatsBytes, totalBlockOtherBytes, getTotal());
-        }
-    }
-
 }
