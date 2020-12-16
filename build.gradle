@@ -35,6 +35,9 @@ dependencies {
     implementation "commons-cli:commons-cli:$commonsCliVersion"
     implementation "org.elasticsearch:elasticsearch-x-content:7.6.2"
 
+    runtimeOnly "org.apache.logging.log4j:log4j-core:$log4jVersion"
+    runtimeOnly "ch.qos.logback:logback-classic:$log4jClassicVersion"
+
     testImplementation "org.junit.jupiter:junit-jupiter-api:$junitJupiterVersion"
 
     testRuntimeOnly "org.apache.logging.log4j:log4j-core:$log4jVersion"
