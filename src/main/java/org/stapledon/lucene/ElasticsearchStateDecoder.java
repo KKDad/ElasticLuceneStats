@@ -64,21 +64,23 @@ public class ElasticsearchStateDecoder {
     // Parse index names are in the format of <Index>_<TID>[_-]<Postfix> into logical groupings
     private static final String INDEX_NAME_PATTERN = "([a-zA-Z_]+){1,3}_(\\d){1,3}[-_]?(.*)";
     private final Pattern pattern = Pattern.compile(INDEX_NAME_PATTERN);
+    private final String indexHome;
 
     ElasticsearchStateDecoder(String directory) {
+        this.indexHome = directory;
         LOG.warn("Reading {}", directory);
         this.decode(directory);
         this.generateGroupings();
     }
 
     private void generateGroupings() {
-        indexMappings.forEach((indexName, value) -> {
+        indexMappings.forEach((indexName, directoryName) -> {
             Matcher m = pattern.matcher(indexName);
             String indexNameShort = indexName;
             if (m.matches())
                 indexNameShort = m.group(1);
             INDEX_GROUPS.putIfAbsent(indexNameShort, new ArrayList<>());
-            INDEX_GROUPS.get(indexNameShort).add(new Index(indexName, value));
+            INDEX_GROUPS.get(indexNameShort).add(new Index(indexHome, indexName, directoryName));
         });
 
         INDEX_GROUPS.forEach((key, value) -> {
@@ -140,21 +142,4 @@ public class ElasticsearchStateDecoder {
         }
         return new HashMap<>();
     }
-
-    class Index {
-        public final String indexName;
-        public final String directoryName;
-
-        public Index(String indexName, String directoryName) {
-            this.indexName = indexName;
-            this.directoryName = directoryName;
-
-        }
-
-        @Override
-        public String toString() {
-            return String.format("Index{indexName='%s', directoryName='%s'}", indexName, directoryName);
-        }
-    }
-
 }

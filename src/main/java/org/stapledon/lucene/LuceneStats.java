@@ -22,19 +22,21 @@ public class LuceneStats {
     public static void main(String[] args) {
         LuceneStats ls = new LuceneStats();
         CommandLine cmd = StartupUtils.parseOptions(args);
-        ls.loadIndexStats(cmd.getOptionValue("indexDirectory"));
+        ls.process(cmd.getOptionValue("indexDirectory"));
     }
 
     public final Map<String, StatsHolder> FIELD_STATS = new TreeMap<>();
-    public long ES_INDEX_SIZE = 0L;
-    public long INDEX_GROUP_SIZE = 0L;
-    public long CALCULATED_GROUP_SIZE = 0L;
+    private long ES_INDEX_SIZE = 0L;
+    private long INDEX_GROUP_SIZE = 0L;
+    private long INDEX_TRANSLOG_SIZE = 0L;
+    private long CALCULATED_GROUP_SIZE = 0L;
 
 
-    public void loadIndexStats(String directory) {
+    public void loadIndexStats(Index index) {
         try {
-            this.INDEX_GROUP_SIZE += getDirectorySize(Paths.get(directory));
-            Directory indexDirectory = FSDirectory.open(Paths.get(directory));
+            this.INDEX_GROUP_SIZE += getDirectorySize(Paths.get(index.getIndexDirectoryName()));
+            this.INDEX_TRANSLOG_SIZE += getDirectorySize(Paths.get(index.getTransLogDirectoryName()));
+            Directory indexDirectory = FSDirectory.open(Paths.get(index.getIndexDirectoryName()));
             IndexReader indexReader = DirectoryReader.open(indexDirectory);
             LOG.debug("Number of Docs: {}", indexReader.numDocs());
             for (LeafReaderContext context : indexReader.leaves()) {
@@ -55,6 +57,7 @@ public class LuceneStats {
                     }
                     long docValues = statsStoredFieldVisitor.STATS.getOrDefault(field.name, 0L);
                     FIELD_STATS.get(field.name).accumulateStoredFieldBytes(docValues);
+                    index.accumulateDocs(reader.numDocs(), reader.numDeletedDocs());
                 }
             }
         } catch (IOException e) {
@@ -90,14 +93,13 @@ public class LuceneStats {
         String indexHome = directory.replace("_state", "indices");
         ES_INDEX_SIZE = getDirectorySize(Paths.get(indexHome));
         dm.INDEX_GROUPS.forEach((s, indices) -> {
-            for (ElasticsearchStateDecoder.Index indexItem : indices) {
-                String fullIndexPath = String.format("%s\\%s\\0\\index", indexHome, indexItem.directoryName);
-                loadIndexStats(fullIndexPath);
+            for (Index indexItem : indices) {
+                loadIndexStats(indexItem);
             }
             LOG.info("Processing Index Group: {}", s);
             FIELD_STATS.forEach((key, value) -> { CALCULATED_GROUP_SIZE += value.getTotal(); });
             FIELD_STATS.forEach((key, value) -> {
-                value.calculate(CALCULATED_GROUP_SIZE);
+                value.calculate(CALCULATED_GROUP_SIZE, INDEX_TRANSLOG_SIZE);
                 LOG.info("  -> {}", value);
             });
             LOG.info("Index Group: {}, {}% of node total, Index: {} bytes, Total bytes (Uncompressed): {},", s, String.format("%2.2f", ((double)INDEX_GROUP_SIZE/ES_INDEX_SIZE)*100), String.format("%,-2d", INDEX_GROUP_SIZE), String.format("%,-2d", CALCULATED_GROUP_SIZE));
@@ -105,6 +107,7 @@ public class LuceneStats {
 
             FIELD_STATS.clear();
             INDEX_GROUP_SIZE = 0L;
+            INDEX_TRANSLOG_SIZE = 0L;
             CALCULATED_GROUP_SIZE = 0L;
         });
     }
@@ -123,14 +126,19 @@ public class LuceneStats {
         long totalBlockStatsBytes;
         long totalBlockOtherBytes;
 
+        long indexTotalBytes;
+        long indexTotalTransLogBytes;
+
         // Total
         double percentage;
         Long getTotal() {
             return storedFieldBytes + indexNumBytes + totalTermBytes + totalBlockSuffixBytes + totalUncompressedBlockSuffixBytes + totalBlockStatsBytes + totalBlockOtherBytes;
         }
 
-        public void calculate(long indexTotalBytes)
+        public void calculate(long indexTotalBytes, long indexTotalTransLogBytes)
         {
+            this.indexTotalBytes = indexTotalBytes;
+            this.indexTotalTransLogBytes = indexTotalTransLogBytes;
             percentage = ((double)getTotal())  / indexTotalBytes * 100;
         }
 
@@ -153,7 +161,8 @@ public class LuceneStats {
 
         @Override
         public String toString() {
-            return String.format("%-35s (%2.2f%%), storedFieldBytes=%d, indexNumBytes=%d, totalTermBytes=%d, totalBlockSuffixBytes=%d, totalUncompressedBlockSuffixBytes=%d, totalBlockStatsBytes=%d, totalBlockOtherBytes=%d, fieldTotal=%d", name, percentage, storedFieldBytes, indexNumBytes, totalTermBytes, totalBlockSuffixBytes, totalUncompressedBlockSuffixBytes, totalBlockStatsBytes, totalBlockOtherBytes, getTotal());
+            return String.format("%-35s (%2.2f%%), Stored=%,d, IndexBytes=%,d, TermBytes=%,d, BlockSuffixBytes=%,d, UncompressedBlockSuffixBytes=%,d, BlockStatsBytes=%,d, BlockOtherBytes=%,d, FieldTotal=%,d",
+                    name, percentage, storedFieldBytes, indexNumBytes, totalTermBytes, totalBlockSuffixBytes, totalUncompressedBlockSuffixBytes, totalBlockStatsBytes, totalBlockOtherBytes, getTotal());
         }
     }
 
