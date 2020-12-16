@@ -28,7 +28,7 @@ public class ElasticLuceneStats {
     }
 
 
-    private void loadIndexStats(IndexGroup group, Index index) {
+    private void loadIndexStats(IndexGroup group, IndexShard index) {
         try {
             // Get the size of this index and add it to the Index Group
             long indexGroupSize = getDirectorySize(Paths.get(index.getIndexDirectoryName()));

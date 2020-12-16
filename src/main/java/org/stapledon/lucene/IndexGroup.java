@@ -7,7 +7,7 @@ import java.util.TreeMap;
 
 public class IndexGroup {
     public final String indexGroupName;
-    public final List<Index> indices;
+    public final List<IndexShard> indices;
 
     public final Map<String, FieldStatsHolder> fields;
 
@@ -23,7 +23,7 @@ public class IndexGroup {
         this.fields = new TreeMap<>();
     }
 
-    public void addIndex(Index index) {
+    public void addIndex(IndexShard index) {
         this.indices.add(index);
     }
 

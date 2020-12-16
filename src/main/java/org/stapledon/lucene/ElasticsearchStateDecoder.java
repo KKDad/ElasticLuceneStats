@@ -80,12 +80,12 @@ public class ElasticsearchStateDecoder {
             if (m.matches())
                 indexNameShort = m.group(1);
             INDEX_GROUPS.putIfAbsent(indexNameShort, new IndexGroup(indexNameShort));
-            INDEX_GROUPS.get(indexNameShort).addIndex(new Index(indexHome, indexName, directoryName));
+            INDEX_GROUPS.get(indexNameShort).addIndex(new IndexShard(indexHome, indexName, directoryName));
         });
 
         INDEX_GROUPS.forEach((key, indexGroup) -> {
             LOG.info("Index {}", key);
-            for (Index index : indexGroup.indices) {
+            for (IndexShard index : indexGroup.indices) {
                 LOG.info("  -> {}", index);
             }
         });

@@ -1,6 +1,6 @@
 package org.stapledon.lucene;
 
-class Index {
+class IndexShard {
     private final String indexHome;
     private final String indexName;
     private final String directoryName;
@@ -20,7 +20,7 @@ class Index {
         return String.format("%s\\%s\\0\\translog", indexHome, directoryName);
     }
 
-    public Index(String indexHome, String indexName, String directoryName) {
+    public IndexShard(String indexHome, String indexName, String directoryName) {
         this.indexHome = indexHome.replace("_state", "indices");
         this.indexName = indexName;
         this.directoryName = directoryName;
