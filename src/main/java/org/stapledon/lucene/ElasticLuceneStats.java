@@ -16,13 +16,13 @@ import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
-public class LuceneStats {
-    private static final Logger LOG = LoggerFactory.getLogger(LuceneStats.class);
+public class ElasticLuceneStats {
+    private static final Logger LOG = LoggerFactory.getLogger(ElasticLuceneStats.class);
     public static final String DISK_BYTES = "%,15d bytes";
 
     public static void main(String[] args)
     {
-        LuceneStats ls = new LuceneStats();
+        ElasticLuceneStats ls = new ElasticLuceneStats();
         CommandLine cmd = StartupUtils.parseOptions(args);
         ls.processNode(cmd.getOptionValue("indexDirectory"));
     }
@@ -73,7 +73,7 @@ public class LuceneStats {
         try (Stream<Path> walk = Files.walk(path)) {
             size = walk
                     .filter(Files::isRegularFile)
-                    .mapToLong(LuceneStats::fileSize)
+                    .mapToLong(ElasticLuceneStats::fileSize)
                     .sum();
         } catch (IOException e) {
             LOG.error("{}", e.getLocalizedMessage(), e);

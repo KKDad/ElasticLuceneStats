@@ -6,7 +6,7 @@ class LuceneStatsTest {
 
     @Test
     void runTest() {
-        LuceneStats subject = new LuceneStats();
+        ElasticLuceneStats subject = new ElasticLuceneStats();
         subject.processNode("D:\\elasticsearch\\ag16-cdf-single.ad.interset.com\\nodes\\0\\_state");
     }
 }
