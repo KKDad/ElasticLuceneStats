@@ -33,8 +33,8 @@ public class IndexGroup {
     }
 
     public void updateDocs(long docs, long deletedDocs) {
-        this.docs +=indexGroupSize;
-        this.deletedDocs += indexTranslogSize;
+        this.docs +=docs;
+        this.deletedDocs += deletedDocs;
     }
 
 }

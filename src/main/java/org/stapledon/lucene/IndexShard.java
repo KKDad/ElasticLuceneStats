@@ -6,8 +6,8 @@ class IndexShard {
     private final String directoryName;
 
     // Disk Sizes
-    public Long indexByteSize;
-    public Long transLogByteSize;
+    public long indexByteSize;
+    public long transLogByteSize;
 
     // Number of Documents in the Index
     long numDocs;
@@ -31,9 +31,13 @@ class IndexShard {
         this.numDeleted += numDeleted;
     }
 
+    public void updateDiskUsage(long indexByteSize, long transLogByteSize) {
+        this.indexByteSize +=indexByteSize;
+        this.transLogByteSize += transLogByteSize;
+    }
 
     @Override
     public String toString() {
-        return String.format("Index{indexName='%s', directoryName='%s'}", indexName, directoryName);
+        return String.format("  %s, %,d docs, %,d deleted docs, %,d bytes, %,2.2f bytes/doc  dir: %s", indexName, numDocs, numDeleted, indexByteSize, (float)indexByteSize /numDocs, directoryName);
     }
 }

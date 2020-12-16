@@ -1,7 +1,13 @@
 plugins {
-    id 'java'
-    id 'application'
+    id "com.github.johnrengelman.shadow" version '6.1.0'
 }
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+
+apply plugin: 'java'
+apply plugin: 'application'
+apply plugin: 'com.github.johnrengelman.shadow'
 
 repositories {
     jcenter()
@@ -43,3 +49,24 @@ application {
 test {
     useJUnitPlatform()
 }
+
+mainClassName = "org.stapledon.lucene.ElasticLuceneStats"
+def build_number_full = (System.getenv("BUILD_NUMBER") != null) ? version + "-" + System.getenv("BUILD_NUMBER") : version
+
+shadowJar {
+    mergeServiceFiles()
+    exclude 'META-INF/*.DSA', 'META-INF/*.RSA', 'META-INF/*.SF'
+    zip64(true)
+    manifest {
+        attributes 'Implementation-Title': rootProject.name
+        attributes 'Implementation-Version': rootProject.version
+        attributes 'Implementation-Vendor-Id': rootProject.group
+        attributes 'Build-Time': ZonedDateTime.now(ZoneId.of("UTC"))
+                .format(DateTimeFormatter.ISO_ZONED_DATE_TIME)
+        attributes 'Built-By': InetAddress.localHost.hostName
+        attributes 'Created-By': 'Gradle ' + gradle.gradleVersion
+        attributes 'Main-Class': mainClassName
+        attributes 'ES-Interset-Build-Number': build_number_full
+    }
+}
+

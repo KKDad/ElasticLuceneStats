@@ -70,7 +70,6 @@ public class ElasticsearchStateDecoder {
         LOG.warn("Reading {}", directory);
         this.decode(directory);
         this.generateGroupings();
-        LOG.info("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
     }
 
     private void generateGroupings() {
@@ -81,13 +80,6 @@ public class ElasticsearchStateDecoder {
                 indexNameShort = m.group(1);
             INDEX_GROUPS.putIfAbsent(indexNameShort, new IndexGroup(indexNameShort));
             INDEX_GROUPS.get(indexNameShort).addIndex(new IndexShard(indexHome, indexName, directoryName));
-        });
-
-        INDEX_GROUPS.forEach((key, indexGroup) -> {
-            LOG.info("Index {}", key);
-            for (IndexShard index : indexGroup.indices) {
-                LOG.info("  -> {}", index);
-            }
         });
     }
 

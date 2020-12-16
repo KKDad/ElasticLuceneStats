@@ -13,12 +13,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 public class ElasticLuceneStats {
     private static final Logger LOG = LoggerFactory.getLogger(ElasticLuceneStats.class);
     public static final String DISK_BYTES = "%,15d bytes";
+    public static final String SECTION_SEPARATOR = "--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------";
 
     public static void main(String[] args)
     {
@@ -33,6 +33,7 @@ public class ElasticLuceneStats {
             // Get the size of this index and add it to the Index Group
             long indexGroupSize = getDirectorySize(Paths.get(index.getIndexDirectoryName()));
             long indexTranslogSize = getDirectorySize(Paths.get(index.getTransLogDirectoryName()));
+            index.updateDiskUsage(indexGroupSize, indexTranslogSize);
             group.updateDiskUsage(indexGroupSize, indexTranslogSize);
 
             Directory indexDirectory = FSDirectory.open(Paths.get(index.getIndexDirectoryName()));
@@ -105,25 +106,31 @@ public class ElasticLuceneStats {
         String esIndexDirectory = esStateDirectory.replace("_state", "indices");
         long esIndexSize = getDirectorySize(Paths.get(esIndexDirectory));
         dm.INDEX_GROUPS.forEach((indexGroupName, indexGroup) -> {
+            // Load the Statistics for each segment
+            indexGroup.fields.forEach((key, fieldStats) -> fieldStats.calculate(indexGroup.indexGroupSize, indexGroup.indexTranslogSize));
 
-            AtomicReference<Long> calculatedGroupSize = new AtomicReference<>(0L);
+            // Display Segment Details
             indexGroup.indices.forEach(i -> loadIndexStats(indexGroup, i));
-
-            indexGroup.fields.forEach((key, fieldStats) -> calculatedGroupSize.updateAndGet(v -> v + fieldStats.getTotal()));
-            indexGroup.fields.forEach((key, fieldStats) -> fieldStats.calculate(calculatedGroupSize.get(), indexGroup.indexTranslogSize));
             LOG.info("Index Group: {}", indexGroupName);
-            LOG.info(" - # of Documents    : {}", String.format("%,2d", indexGroup.docs));
-            LOG.info(" - # of Deleted Docs : {}", String.format("%,2d", indexGroup.deletedDocs));
-            LOG.info(" - Overall Percentage: {}", String.format("%2.2f%%", ((double) indexGroup.indexGroupSize / esIndexSize)*100));
-            LOG.info(" - Overall Percentage: {}", String.format("%2.2f%%", ((double) indexGroup.indexGroupSize / esIndexSize)*100));
+            LOG.info(SECTION_SEPARATOR);
+            for (IndexShard index : indexGroup.indices) {
+                LOG.info("  -> {}", index);
+            }
+            LOG.info(SECTION_SEPARATOR);
+
+
+            LOG.info("Index Statistics: {}", indexGroupName);
+            LOG.info(" - # of Documents    : {}", String.format("%,15d", indexGroup.docs));
+            LOG.info(" - # of Deleted Docs : {}", String.format("%,15d", indexGroup.deletedDocs));
+            LOG.info(" - Overall Percentage: {}", String.format("%15.2f %%", ((double) indexGroup.indexGroupSize / esIndexSize)*100));
             LOG.info(" - Lucene Index      : {}", String.format(DISK_BYTES, indexGroup.indexGroupSize));
             LOG.info(" - Lucene TransLog   : {}", String.format(DISK_BYTES, indexGroup.indexTranslogSize));
-            LOG.info(" - Total Uncompressed: {}", String.format(DISK_BYTES, calculatedGroupSize.get()));
-            LOG.info("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
-            indexGroup.fields.forEach((key, fieldStats) -> {
-                fieldStats.calculate(calculatedGroupSize.get(), indexGroup.indexTranslogSize);
-                LOG.info("  -> {}", fieldStats);
-            });
+            LOG.info(" - Total Uncompressed: {}", String.format(DISK_BYTES, indexGroup.indexGroupSize));
+            LOG.info(SECTION_SEPARATOR);
+            if (indexGroup.fields.size() == 0)
+                LOG.info("No Records");
+            else
+                indexGroup.fields.forEach((key, fieldStats) -> LOG.info("  -> {}", fieldStats));
             LOG.info("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n\n");
         });
     }
