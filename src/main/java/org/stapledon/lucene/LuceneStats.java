@@ -25,7 +25,8 @@ public class LuceneStats {
         ls.loadIndexStats(cmd.getOptionValue("indexDirectory"));
     }
 
-    public final Map<String, List<StatsHolder>> FIELD_STATS = new TreeMap<>();
+    public final Map<String, StatsHolder> FIELD_STATS = new TreeMap<>();
+    public long ES_INDEX_SIZE = 0L;
     public long INDEX_GROUP_SIZE = 0L;
     public long CALCULATED_GROUP_SIZE = 0L;
 
@@ -38,23 +39,22 @@ public class LuceneStats {
             LOG.debug("Number of Docs: {}", indexReader.numDocs());
             for (LeafReaderContext context : indexReader.leaves()) {
                 // Visit all of the documents and calculate the size of the stored fields
-                StatsStoredFieldVisitor ssfv = new StatsStoredFieldVisitor();
+                StatsStoredFieldVisitor statsStoredFieldVisitor = new StatsStoredFieldVisitor();
                 LeafReader reader = FilterLeafReader.unwrap(context.reader());
-                for (int i = 0; i < reader.maxDoc(); i++) {
-                    reader.document(i, ssfv);
+                int i = 0;
+                while (i < reader.maxDoc()) {
+                    reader.document(i, statsStoredFieldVisitor);
+                    i++;
                 }
                 for (FieldInfo field : reader.getFieldInfos()) {
-                    if (!FIELD_STATS.containsKey(field.name))
-                        FIELD_STATS.put(field.name, new ArrayList<>());
-                    long docValues = ssfv.STATS.getOrDefault(field.name, 0L);
+                    FIELD_STATS.putIfAbsent(field.name, new StatsHolder(field.name));
                     Terms terms = reader.terms(field.name);
                     if (terms instanceof FieldReader) {
                         Stats fieldStats = ((FieldReader) terms).getStats();
-                        FIELD_STATS.get(field.name).add(new StatsHolder(fieldStats, docValues));
-                        LOG.trace("{}: {}", field.name, fieldStats);
-                    } else {
-                        FIELD_STATS.get(field.name).add(new StatsHolder(null, docValues));
+                        FIELD_STATS.get(field.name).accumulateStats(fieldStats);
                     }
+                    long docValues = statsStoredFieldVisitor.STATS.getOrDefault(field.name, 0L);
+                    FIELD_STATS.get(field.name).accumulateStoredFieldBytes(docValues);
                 }
             }
         } catch (IOException e) {
@@ -88,43 +88,20 @@ public class LuceneStats {
     public void process(String directory) {
         ElasticsearchStateDecoder dm = new ElasticsearchStateDecoder(directory);
         String indexHome = directory.replace("_state", "indices");
+        ES_INDEX_SIZE = getDirectorySize(Paths.get(indexHome));
         dm.INDEX_GROUPS.forEach((s, indices) -> {
             for (ElasticsearchStateDecoder.Index indexItem : indices) {
                 String fullIndexPath = String.format("%s\\%s\\0\\index", indexHome, indexItem.directoryName);
                 loadIndexStats(fullIndexPath);
             }
             LOG.info("Processing Index Group: {}", s);
+            FIELD_STATS.forEach((key, value) -> { CALCULATED_GROUP_SIZE += value.getTotal(); });
             FIELD_STATS.forEach((key, value) -> {
-                long totalTermCount;
-
-                long indexNumBytes;
-                long totalTermBytes;
-                long totalBlockSuffixBytes;
-                long totalUncompressedBlockSuffixBytes;
-                long totalBlockStatsBytes;
-                long totalBlockOtherBytes;
-
-                long totalStoredFieldBytes;
-
-                totalTermCount = value.stream().mapToLong(statsHolder -> statsHolder.stats == null ? 0L : statsHolder.stats.totalTermCount).sum();
-
-                indexNumBytes = value.stream().mapToLong(statsHolder -> statsHolder.stats == null ? 0L : statsHolder.stats.indexNumBytes).sum();
-                totalTermBytes = value.stream().mapToLong(statsHolder -> statsHolder.stats == null ? 0L : statsHolder.stats.totalTermBytes).sum();
-                totalBlockSuffixBytes = value.stream().mapToLong(statsHolder -> statsHolder.stats == null ? 0L : statsHolder.stats.totalBlockSuffixBytes).sum();
-                totalUncompressedBlockSuffixBytes = value.stream().mapToLong(statsHolder -> statsHolder.stats == null ? 0L : statsHolder.stats.totalUncompressedBlockSuffixBytes).sum();
-                totalBlockStatsBytes = value.stream().mapToLong(statsHolder -> statsHolder.stats == null ? 0L : statsHolder.stats.totalBlockStatsBytes).sum();
-                totalBlockOtherBytes = value.stream().mapToLong(statsHolder -> statsHolder.stats == null ? 0L : statsHolder.stats.totalBlockOtherBytes).sum();
-                totalStoredFieldBytes = value.stream().mapToLong(statsHolder -> statsHolder.storedFieldBytes).sum();
-
-
-                long fieldTotal = indexNumBytes + totalTermBytes + totalBlockSuffixBytes + totalUncompressedBlockSuffixBytes + totalBlockStatsBytes + totalBlockOtherBytes + totalStoredFieldBytes;
-                CALCULATED_GROUP_SIZE += fieldTotal;
-
-                LOG.info("  -> {}: Total: {} indexNumBytes: {} TermBytes: {} BlockSuffixBytes: {} UncompressedBlockSuffixBytes: {} BlockStatsBytes: {} BlockOtherByte: {} StoredFieldBytes: {}",
-                        String.format("%-35s", key), fieldTotal, indexNumBytes, totalTermBytes, totalBlockSuffixBytes, totalUncompressedBlockSuffixBytes, totalBlockStatsBytes, totalBlockOtherBytes, totalStoredFieldBytes);
+                value.calculate(CALCULATED_GROUP_SIZE);
+                LOG.info("  -> {}", value);
             });
-            LOG.info("Index Group: {}, Index: {} bytes, Total bytes (Uncompressed): {}", s, String.format("%,-2d", INDEX_GROUP_SIZE), String.format("%,-2d", CALCULATED_GROUP_SIZE));
-            LOG.info("--------------------------------------------------");
+            LOG.info("Index Group: {}, {}% of node total, Index: {} bytes, Total bytes (Uncompressed): {},", s, String.format("%2.2f", ((double)INDEX_GROUP_SIZE/ES_INDEX_SIZE)*100), String.format("%,-2d", INDEX_GROUP_SIZE), String.format("%,-2d", CALCULATED_GROUP_SIZE));
+            LOG.info("--------------------------------------------------\n\n");
 
             FIELD_STATS.clear();
             INDEX_GROUP_SIZE = 0L;
@@ -133,12 +110,50 @@ public class LuceneStats {
     }
 
     class StatsHolder {
-        Stats stats;
-        Long storedFieldBytes;
+        String name;
 
-        public StatsHolder(Stats stats, Long storedFieldBytes) {
-            this.stats = stats;
-            this.storedFieldBytes = storedFieldBytes;
+        // Stored Documents
+        long storedFieldBytes;
+
+        // Term Stats
+        long indexNumBytes;
+        long totalTermBytes;
+        long totalBlockSuffixBytes;
+        long totalUncompressedBlockSuffixBytes;
+        long totalBlockStatsBytes;
+        long totalBlockOtherBytes;
+
+        // Total
+        double percentage;
+        Long getTotal() {
+            return storedFieldBytes + indexNumBytes + totalTermBytes + totalBlockSuffixBytes + totalUncompressedBlockSuffixBytes + totalBlockStatsBytes + totalBlockOtherBytes;
+        }
+
+        public void calculate(long indexTotalBytes)
+        {
+            percentage = ((double)getTotal())  / indexTotalBytes * 100;
+        }
+
+        public StatsHolder(String name) {
+            this.name = name;
+        }
+
+        public void accumulateStats(Stats stats) {
+            indexNumBytes += stats.indexNumBytes;
+            totalTermBytes += stats.totalTermBytes;
+            totalBlockSuffixBytes += stats.totalBlockSuffixBytes;
+            totalUncompressedBlockSuffixBytes += stats.totalUncompressedBlockSuffixBytes;
+            totalBlockStatsBytes += stats.totalBlockStatsBytes;
+            totalBlockOtherBytes += stats.totalBlockOtherBytes;
+        }
+
+        public void accumulateStoredFieldBytes(Long storedFieldBytes) {
+            this.storedFieldBytes += storedFieldBytes;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%-35s (%2.2f%%), storedFieldBytes=%d, indexNumBytes=%d, totalTermBytes=%d, totalBlockSuffixBytes=%d, totalUncompressedBlockSuffixBytes=%d, totalBlockStatsBytes=%d, totalBlockOtherBytes=%d, fieldTotal=%d", name, percentage, storedFieldBytes, indexNumBytes, totalTermBytes, totalBlockSuffixBytes, totalUncompressedBlockSuffixBytes, totalBlockStatsBytes, totalBlockOtherBytes, getTotal());
         }
     }
 

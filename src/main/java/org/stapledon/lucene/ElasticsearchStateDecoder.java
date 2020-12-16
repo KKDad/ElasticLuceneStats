@@ -74,11 +74,11 @@ public class ElasticsearchStateDecoder {
     private void generateGroupings() {
         indexMappings.forEach((indexName, value) -> {
             Matcher m = pattern.matcher(indexName);
+            String indexNameShort = indexName;
             if (m.matches())
-                indexName = m.group(1);
-            if (!INDEX_GROUPS.containsKey(indexName))
-                INDEX_GROUPS.put(indexName, new ArrayList<>());
-            INDEX_GROUPS.get(indexName).add(new Index(indexName, value));
+                indexNameShort = m.group(1);
+            INDEX_GROUPS.putIfAbsent(indexNameShort, new ArrayList<>());
+            INDEX_GROUPS.get(indexNameShort).add(new Index(indexName, value));
         });
 
         INDEX_GROUPS.forEach((key, value) -> {
