@@ -37,18 +37,25 @@ public class ElasticLuceneStats {
             group.updateDiskUsage(indexGroupSize, indexTranslogSize);
 
             Directory indexDirectory = FSDirectory.open(Paths.get(index.getIndexDirectoryName()));
+            if (indexDirectory.listAll().length == 0) {
+                LOG.error("No Lucene segments located in {}", index.getIndexDirectoryName());
+                return;
+            }
             try (IndexReader indexReader = DirectoryReader.open(indexDirectory)) {
-                LOG.debug("Number of Docs: {}", indexReader.numDocs());
+                LOG.debug("{} has {} segments to process", index.getIndexShortName(), indexReader.leaves().size());
                 for (LeafReaderContext context : indexReader.leaves()) {
+
                     // Visit all of the documents and calculate the size of the stored fields
                     StatsStoredFieldVisitor statsStoredFieldVisitor = new StatsStoredFieldVisitor();
                     LeafReader reader = FilterLeafReader.unwrap(context.reader());
                     int i = 0;
+                    LOG.debug("  -> Processing segment {} with {} documents", context.ord, reader.numDocs());
                     while (i < reader.maxDoc()) {
                         reader.document(i, statsStoredFieldVisitor);
                         i++;
                     }
                     // Visit all of the Fields and get the statistics for them
+                    LOG.debug("  -> Processing {} fields", reader.getFieldInfos().size());
                     for (FieldInfo field : reader.getFieldInfos()) {
                         group.fields.putIfAbsent(field.name, new FieldStatsHolder(field.name, field.getIndexOptions()));
                         Terms terms = reader.terms(field.name);
@@ -65,7 +72,7 @@ public class ElasticLuceneStats {
                 }
             }
         } catch (IOException e) {
-            LOG.error(e.getLocalizedMessage(), e);
+            LOG.error(e.getLocalizedMessage());
         }
     }
 

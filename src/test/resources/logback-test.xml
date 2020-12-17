@@ -8,10 +8,20 @@
             <level>DEBUG</level>
         </filter>
     </appender>
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>report.log</file>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <Pattern>%d{ISO8601} %level %logger{15} - %msg%n</Pattern>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>INFO</level>
+        </filter>
+    </appender>
 
     <logger name="io.k8s.cassandra" level="DEBUG"/>
 
-    <root level="INFO">
-        <appender-ref ref="STDOUT" />
+    <root level="DEBUG">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="FILE"/>
     </root>
 </configuration>

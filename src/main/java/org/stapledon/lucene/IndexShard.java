@@ -12,6 +12,9 @@ class IndexShard {
     // Number of Documents in the Index
     long numDocs;
     long numDeleted;
+    public String getIndexShortName() {
+        return directoryName;
+    }
 
     public String getIndexDirectoryName() {
         return String.format("%s/%s/0/index", indexHome, directoryName);

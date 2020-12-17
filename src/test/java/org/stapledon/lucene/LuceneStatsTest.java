@@ -9,4 +9,6 @@ class LuceneStatsTest {
         ElasticLuceneStats subject = new ElasticLuceneStats();
         subject.processNode("D:\\elasticsearch\\ag16-cdf-single.ad.interset.com\\nodes\\0\\_state");
     }
+
+
 }
