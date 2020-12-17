@@ -3,6 +3,9 @@ package org.stapledon.lucene;
 import org.apache.lucene.codecs.blocktree.Stats;
 import org.apache.lucene.index.IndexOptions;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class FieldStatsHolder {
     private final IndexOptions indexOptions;
     String name;
@@ -23,6 +26,8 @@ public class FieldStatsHolder {
     // Sum of Terms (Not unique)
     long totalTermCount;
 
+    final List<String> sampleDocs = new ArrayList<>();
+
 
 
     // Total
@@ -40,6 +45,12 @@ public class FieldStatsHolder {
     public FieldStatsHolder(String name, IndexOptions indexOptions) {
         this.name = name;
         this.indexOptions = indexOptions;
+    }
+
+    public void accumulateSample(String sampleDoc) {
+        if (sampleDoc != null) {
+            this.sampleDocs.add(sampleDoc);
+        }
     }
 
     public void accumulateStats(Stats stats) {

@@ -20,11 +20,17 @@ public class ElasticLuceneStats {
     public static final String DISK_BYTES = "%,15d bytes";
     public static final String SECTION_SEPARATOR = "--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------";
 
+    public final CommandLine options;
+
+    public ElasticLuceneStats(CommandLine options) {
+        this.options = options;
+    }
+
     public static void main(String[] args)
     {
-        ElasticLuceneStats ls = new ElasticLuceneStats();
-        CommandLine cmd = StartupUtils.parseOptions(args);
-        ls.processNode(cmd.getOptionValue("indexDirectory"));
+        CommandLine options = StartupUtils.parseOptions(args);
+        ElasticLuceneStats ls = new ElasticLuceneStats(options);
+        ls.process();
     }
 
 
@@ -46,11 +52,14 @@ public class ElasticLuceneStats {
                 for (LeafReaderContext context : indexReader.leaves()) {
 
                     // Visit all of the documents and calculate the size of the stored fields
+                    boolean estimate = this.options.hasOption(StartupUtils.OPTION_SAMPLE);
                     StatsStoredFieldVisitor statsStoredFieldVisitor = new StatsStoredFieldVisitor();
                     LeafReader reader = FilterLeafReader.unwrap(context.reader());
                     int i = 0;
                     LOG.debug("  -> Processing segment {} with {} documents", context.ord, reader.numDocs());
-                    while (i < reader.maxDoc()) {
+                    long segmentLimit = this.options.hasOption(StartupUtils.OPTION_SAMPLE) ? Long.parseLong(this.options.getOptionValue(StartupUtils.OPTION_NUMBER_OF_SAMPLES, StartupUtils.DEFAULT_SAMPLE_SIZE)) : Long.MAX_VALUE;
+                    segmentLimit = Math.min(segmentLimit, reader.maxDoc());
+                    while (i < segmentLimit) {
                         reader.document(i, statsStoredFieldVisitor);
                         i++;
                     }
@@ -63,8 +72,13 @@ public class ElasticLuceneStats {
                             Stats fieldStats = ((FieldReader) terms).getStats();
                             group.fields.get(field.name).accumulateStats(fieldStats);
                         }
+                        // Adjust docValues if it's an estimated value
                         long docValues = statsStoredFieldVisitor.STATS.getOrDefault(field.name, 0L);
+                        if (estimate) {
+                            docValues = new Double((docValues / segmentLimit) * reader.maxDoc()).longValue();
+                        }
                         group.fields.get(field.name).accumulateStoredFieldBytes(docValues);
+                        group.fields.get(field.name).accumulateSample(statsStoredFieldVisitor.SAMPLE.getOrDefault(field.name, null));
                     }
                     // Accumulate the number of docs and deleted docs for this segment
                     index.updateDocs(reader.numDocs(), reader.numDeletedDocs());
@@ -102,7 +116,8 @@ public class ElasticLuceneStats {
     }
 
 
-    public void processNode(String esStateDirectory) {
+    public void process() {
+        String esStateDirectory = this.options.getOptionValue(StartupUtils.OPTION_INDEX_DIRECTORY);
         if (!esStateDirectory.toLowerCase().endsWith("_state")) {
             LOG.error("This doesn't look like a Elasticsearch node state directory.");
             LOG.error("Expected something like: D:\\elasticsearch\\ag16-cdf-single.ad.interset.com\\nodes\\0\\_state");
@@ -142,9 +157,18 @@ public class ElasticLuceneStats {
             LOG.info(SECTION_SEPARATOR);
             if (indexGroup.fields.size() == 0)
                 LOG.info("No Records");
-            else
+            else {
                 indexGroup.fields.forEach((key, fieldStats) -> LOG.info("  -> {}", fieldStats));
-            LOG.info("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n\n");
+                if (options.hasOption(StartupUtils.OPTION_DOC)) {
+                    LOG.info(SECTION_SEPARATOR);
+                    LOG.info("Sample Docs:");
+                    indexGroup.fields.forEach((key, fieldStats) -> {
+                            if (fieldStats.sampleDocs.size() > 0)
+                                LOG.info("  {} -> {}", fieldStats.name, fieldStats.sampleDocs.get(0));
+                    });
+                }
+            }
+            LOG.info("{}\n\n", SECTION_SEPARATOR);
         });
     }
 }

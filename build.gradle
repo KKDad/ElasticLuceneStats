@@ -21,6 +21,7 @@ ext {
     log4jVersion="2.13.3"
     log4jClassicVersion="1.2.3"
     luceneCoreVersion = "8.5.2"
+    mockitoVersion = '2.23.0'
     slf4jVersion = "1.7.30"
 }
 
@@ -43,6 +44,7 @@ dependencies {
     testRuntimeOnly "org.apache.logging.log4j:log4j-core:$log4jVersion"
     testRuntimeOnly "ch.qos.logback:logback-classic:$log4jClassicVersion"
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junitJupiterVersion"
+    testImplementation "org.mockito:mockito-core:$mockitoVersion"
 }
 
 application {

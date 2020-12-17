@@ -8,17 +8,32 @@ public class StartupUtils {
     private static final Logger LOG = LoggerFactory.getLogger(StartupUtils.class);
     private static final Integer ERROR_STATUS = 1;
 
+    public static final String DEFAULT_SAMPLE_SIZE = "10000";
+
+    public static final String OPTION_INDEX_DIRECTORY = "indexDirectory";
+    public static final String OPTION_SAMPLE = "sample";
+    public static final String OPTION_DOC = "doc";
+    public static final String OPTION_NUMBER_OF_SAMPLES = "sampleSize";
+
 
     public static CommandLine parseOptions(String[] args) {
         Options options = new Options();
 
-        Option option = new Option("c", "configFile", true, "path to configuration yaml");
-        //option.setRequired(true);
-        options.addOption(option);
-
-        option = new Option("d", "indexDirectory", true, "directory containing lucene index");
+        // Required - directory to the ElasticSearch index
+        Option option = new Option("d", OPTION_INDEX_DIRECTORY, true, "Directory containing elasticsearch index");
         option.setRequired(true);
         options.addOption(option);
+
+        option = new Option("s", OPTION_SAMPLE, false, "Sample the lucene index and produce an estimated size for stored fields.");
+        options.addOption(option);
+
+        option = new Option("n", OPTION_NUMBER_OF_SAMPLES, true, "Number of documents to sample per segment, if sampling is enabled. Defaults to " + DEFAULT_SAMPLE_SIZE);
+        options.addOption(option);
+
+
+        option = new Option("d", OPTION_DOC, false, "Include a random document for stored fields.");
+        options.addOption(option);
+
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
