@@ -102,6 +102,7 @@ public class ElasticsearchStateDecoder {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private void processIndexEntry(LeafReader reader, int i) throws IOException {
         IndexableField data = reader.document(i).getField("data");
         Map<String, Object> index = decodeXContent(data.binaryValue().bytes);

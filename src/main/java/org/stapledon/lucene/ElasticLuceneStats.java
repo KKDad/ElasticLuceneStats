@@ -77,6 +77,9 @@ public class ElasticLuceneStats {
     }
 
     private long getDirectorySize(Path path) {
+        if (!path.toFile().exists())
+            return 0L;
+
         long size = 0;
         try (Stream<Path> walk = Files.walk(path)) {
             size = walk
