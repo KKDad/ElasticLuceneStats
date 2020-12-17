@@ -31,7 +31,7 @@ public class StartupUtils {
         options.addOption(option);
 
 
-        option = new Option("d", OPTION_DOC, false, "Include a random document for stored fields.");
+        option = new Option("i", OPTION_DOC, false, "Include a random document for stored fields.");
         options.addOption(option);
 
 

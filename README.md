@@ -9,11 +9,13 @@ gradlew shadowJar
 
 $ java -jar LuceneStats-all.jar -?
 usage: LuceneStats
- -d,--doc                Include a random document for stored fields.
- -n,--sampleSize <arg>   Number of documents to sample per segment, if
-                         sampling is enabled. Defaults to 10000
- -s,--sample             Sample the lucene index and produce an estimated
-                         size for stored fields.
+ -d,--indexDirectory <arg>   Directory containing elasticsearch index
+ -i,--doc                    Include a random document for stored fields.
+ -n,--sampleSize <arg>       Number of documents to sample per segment, if
+                             sampling is enabled. Defaults to 10000
+ -s,--sample                 Sample the lucene index and produce an
+                             estimated size for stored fields.
+
 
 $ java -jar LuceneStats-all.jar -d /d/elasticsearch/ag16-cdf-single.ad.interset.com/nodes/0/_state
 
