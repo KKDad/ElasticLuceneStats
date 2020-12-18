@@ -123,7 +123,9 @@ public class ElasticLuceneStats {
             LOG.error("Expected something like: D:\\elasticsearch\\ag16-cdf-single.ad.interset.com\\nodes\\0\\_state");
             return;
         }
-        ElasticsearchStateDecoder dm = new ElasticsearchStateDecoder(esStateDirectory);
+        ElasticsearchStateDecoder dm = new ElasticsearchStateDecoder();
+        dm.decode(esStateDirectory);
+        dm.generateGroupings();
         if (dm.INDEX_GROUPS.size() == 0) {
             LOG.error("No index groups loaded.");
             return;
@@ -132,13 +134,28 @@ public class ElasticLuceneStats {
         long esIndexSize = getDirectorySize(Paths.get(esIndexDirectory));
         dm.INDEX_GROUPS.forEach((indexGroupName, indexGroup) -> {
 
-            // Display Segment Details
+            // Load the Statistics for each segment
+            LOG.debug("Index Group: {}", indexGroupName);
             indexGroup.indices.forEach(i -> loadIndexStats(indexGroup, i));
             indexGroup.calculate();
 
-            // Load the Statistics for each segment
             indexGroup.fields.forEach((key, fieldStats) -> fieldStats.calculate(indexGroup.totalCalculatedSize));
+        });
+        LOG.info("{}\n\n", SECTION_SEPARATOR);
+        LOG.info("Index Groups");
+        LOG.info(SECTION_SEPARATOR);
+        dm.INDEX_GROUPS.forEach((indexGroupName, indexGroup) -> {
+            LOG.info(String.format("Index Group: %-33s  Percentage: %6.2f%%,  Documents: %,18d,  Size: %,20d",
+                    indexGroupName,
+                    ((double) indexGroup.totalDiskSize / esIndexSize)*100,
+                    indexGroup.docs,
+                    indexGroup.totalDiskSize));
 
+        });
+        LOG.info("{}\n\n", SECTION_SEPARATOR);
+        dm.INDEX_GROUPS.forEach((indexGroupName, indexGroup) -> {
+
+            // Display Segment Details
             LOG.info("Index Group: {}", indexGroupName);
             LOG.info(SECTION_SEPARATOR);
             for (IndexShard index : indexGroup.indices) {

@@ -12,6 +12,7 @@ class IndexShard {
     // Number of Documents in the Index
     long numDocs;
     long numDeleted;
+    long numSegments;
     public String getIndexShortName() {
         return directoryName;
     }
@@ -30,6 +31,7 @@ class IndexShard {
 
     }
     public void updateDocs(long numDocs, long numDeleted) {
+        this.numSegments += 1;
         this.numDocs += numDocs;
         this.numDeleted += numDeleted;
     }
@@ -41,6 +43,6 @@ class IndexShard {
 
     @Override
     public String toString() {
-        return String.format("%s; %,d docs;  %,d deleted docs;  %,d bytes;  %,2.2f bytes/doc  dir: %s", indexName, numDocs, numDeleted, indexByteSize, (float)indexByteSize /numDocs, directoryName);
+        return String.format("%s; %,d segments, %,d docs;  %,d deleted docs;  %,d bytes;  %,2.2f bytes/doc  dir: %s", indexName, numSegments, numDocs, numDeleted, indexByteSize, (float)indexByteSize /numDocs, directoryName);
     }
 }

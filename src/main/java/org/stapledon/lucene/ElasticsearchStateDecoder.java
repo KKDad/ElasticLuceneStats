@@ -57,34 +57,32 @@ import java.util.regex.Pattern;
 public class ElasticsearchStateDecoder {
     private static final Logger LOG = LoggerFactory.getLogger(ElasticsearchStateDecoder.class);
 
-    private final Map<String, String> indexMappings = new TreeMap<>();
+    protected final Map<String, String> indexMappings = new TreeMap<>();
+    protected String indexHome;
+
     public final Map<String, IndexGroup> INDEX_GROUPS = new TreeMap<>();
 
     // Interset index names are in the format of <Index>_<TID>[_-]<Postfix> into logical groupings
-    private static final String INDEX_NAME_PATTERN = "([a-zA-Z_]+){1,3}_(\\d){1,3}[-_]?(.*)";
+    private static final String INDEX_NAME_PATTERN = "<?([a-zA-Z_]+){1,3}_([a-zA-Z0-9]+){1,3}[-_]?(.*)>?";
     private final Pattern pattern = Pattern.compile(INDEX_NAME_PATTERN);
-    private final String indexHome;
 
-    ElasticsearchStateDecoder(String directory) {
-        this.indexHome = directory;
-        LOG.warn("Reading {}", directory);
-        this.decode(directory);
-        this.generateGroupings();
-    }
 
-    private void generateGroupings() {
+    public void generateGroupings() {
         indexMappings.forEach((indexName, directoryName) -> {
             Matcher m = pattern.matcher(indexName);
             String indexNameShort = indexName;
             if (m.matches())
-                indexNameShort = m.group(1);
+                indexNameShort = m.group(1) + "_" + m.group(2);
             INDEX_GROUPS.putIfAbsent(indexNameShort, new IndexGroup(indexNameShort));
             INDEX_GROUPS.get(indexNameShort).addIndex(new IndexShard(indexHome, indexName, directoryName));
         });
     }
 
-    private void decode(String directory) {
+    public void decode(String directory) {
         try {
+            this.indexHome = directory;
+            LOG.warn("Reading {}", directory);
+
             Directory indexDirectory = FSDirectory.open(Paths.get(directory));
             try (IndexReader indexReader = DirectoryReader.open(indexDirectory)) {
                 for (LeafReaderContext context : indexReader.leaves()) {
