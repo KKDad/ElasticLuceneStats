@@ -4,7 +4,7 @@ import org.apache.lucene.index.*;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.Bits;
-import org.elasticsearch.common.xcontent.*;
+import org.elasticsearch.xcontent.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
