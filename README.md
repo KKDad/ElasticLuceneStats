@@ -1,5 +1,7 @@
 ## ElasticLuceneStats
 
+[![Java CI with Gradle](https://github.com/KKDad/ElasticLuceneStats/actions/workflows/maven-publish.yml/badge.svg)](https://github.com/KKDad/ElasticLuceneStats/actions/workflows/maven-publish.yml)
+
 Quick program to dig deeper into an Elasticsearch node and pull out the stats on a per-field bases for each
 grouping of indexes for the purposes of optimizing (in this case, reducing their size)
 
