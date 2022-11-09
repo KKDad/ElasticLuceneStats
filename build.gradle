@@ -22,7 +22,7 @@ ext {
     guavaVersion = "31.0.1-jre"
     junitJupiterVersion = '5.8.2'
     log4jClassicVersion="1.2.3"
-    log4jVersion="2.13.3"
+    log4jVersion="2.19.0"
     luceneCoreVersion = "8.11.1"
     mockitoVersion = '4.2.0'
     slf4jVersion = "1.7.30"
