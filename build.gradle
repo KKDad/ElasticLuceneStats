@@ -24,7 +24,7 @@ ext {
     log4jClassicVersion="1.2.3"
     log4jVersion="2.19.0"
     luceneCoreVersion = "8.11.1"
-    mockitoVersion = '4.2.0'
+    mockitoVersion = '4.8.1'
     slf4jVersion = "2.0.3"
 }
 
