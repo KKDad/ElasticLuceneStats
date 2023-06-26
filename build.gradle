@@ -23,7 +23,7 @@ ext {
     junitJupiterVersion = '5.9.2'
     log4jClassicVersion="1.4.5"
     log4jVersion="2.20.0"
-    luceneCoreVersion = "8.11.1"
+    luceneCoreVersion = "9.7.0"
     mockitoVersion = '5.3.1'
     slf4jVersion = "2.0.6"
 }
