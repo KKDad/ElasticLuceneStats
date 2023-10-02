@@ -20,7 +20,7 @@ ext {
     elasticsearchVersion = "7.16.3"
     gsonVersion = "2.10.1"
     guavaVersion = "32.1.2-jre"
-    junitJupiterVersion = '5.9.3'
+    junitJupiterVersion = '5.10.0'
     log4jClassicVersion="1.4.5"
     log4jVersion="2.20.0"
     luceneCoreVersion = "8.11.1"
