@@ -21,7 +21,7 @@ ext {
     gsonVersion = "2.10.1"
     guavaVersion = "32.1.2-jre"
     junitJupiterVersion = '5.9.3'
-    log4jClassicVersion="1.4.5"
+    log4jClassicVersion="1.4.14"
     log4jVersion="2.20.0"
     luceneCoreVersion = "8.11.1"
     mockitoVersion = '5.5.0'
